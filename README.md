@@ -1,0 +1,2 @@
+# DNSCascade
+- I have been learning about the fundementals of networking. This includes the ISO model and how each layer functions. Because of that, I wanted to make a DNS simulator which starts off with a search from the client using their respective user agent (chrome, safari, etc), and ends up with an IP address. 

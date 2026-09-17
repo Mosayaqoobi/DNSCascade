@@ -22,6 +22,7 @@ _deps/
 *.so
 *.dylib
 *.exe
+.cache
 
 # Editor / IDE
 .vscode/

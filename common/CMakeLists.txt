@@ -9,3 +9,4 @@ add_executable(test_roundtrip
 )
 target_link_libraries(test_roundtrip PRIVATE common)
 target_include_directories(common PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(common PUBLIC nlohmann_json::nlohmann_json)

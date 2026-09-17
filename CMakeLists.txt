@@ -23,3 +23,6 @@ add_subdirectory(tld)
 add_subdirectory(authoritative)
 add_subdirectory(client)
 add_subdirectory(resolver)
+
+add_executable(dns_client main.cpp)
+target_link_libraries(dns_client PRIVATE client)

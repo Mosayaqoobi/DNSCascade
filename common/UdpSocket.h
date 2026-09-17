@@ -14,13 +14,12 @@ class UdpSocket {
 public:
     UdpSocket();
     ~UdpSocket();
-
     /**
      * @brief Listen on a specific port for any messages (for servers only)
-     * 
+     *
      * @param port the port to listen on
      */
-    void bind(int port);
+    void bind(int port) const;
 
     /**
      * @brief send raw bytes to the respective ip and port
@@ -29,7 +28,7 @@ public:
      * @param ip address
      * @param port location
      */
-    void sendTo(const std::string& data, const std::string& ip, int port);
+    void sendTo(const std::string& data, const std::string& ip, int port) const;
 
     /**
      * @brief block until data arrives
@@ -38,14 +37,14 @@ public:
      * @param outSenderPort the port it came from
      * @return false on timeout, or true on data received
      */
-    bool receiveFrom(std::string& outData, std::string& outSenderIp, int& outSenderPort);
+    bool receiveFrom(std::string& outData, std::string& outSenderIp, int outSenderPort) const;
 
     /**
      * @brief Set the Timout object
      * 
      * @param seconds number of seconds to timeout
      */
-    void setTimout(int seconds);
+    void setTimout(int seconds) const;
 
 private:
     int sockfd_;

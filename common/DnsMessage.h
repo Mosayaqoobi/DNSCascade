@@ -19,7 +19,7 @@ struct DnsMessage {
     std::vector<ResourceRecord> authority;
     std::vector<ResourceRecord> additional;
 
-    std::string serialize() const;
+    [[nodiscard]] std::string serialize() const;
     static DnsMessage deserialize(const std::string& data);
 };
 

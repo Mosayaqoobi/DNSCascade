@@ -1,0 +1,6 @@
+{
+    "resolverIp"    : "127.0.0.1",
+    "resolverport"  : 5300,
+    "timeoutSeconds": 3,
+    "maxRetries"    : 2
+}

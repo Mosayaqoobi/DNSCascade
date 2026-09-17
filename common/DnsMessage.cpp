@@ -7,7 +7,6 @@ date: 9/13/2026
 
 #include "DnsMessage.h"
 #include "DnsRecord.h"
-#include <cstdint>
 #include <sstream>
 #include <stdexcept>
 
@@ -53,9 +52,9 @@ namespace {
 std::string DnsMessage::serialize() const {
     std::ostringstream out;
 
-    out << "HEADER|" << header.id << "|" << header.qr << "|" << (int)header.opcode
+    out << "HEADER|" << header.id << "|" << header.qr << "|" << static_cast<int>(header.opcode)
         << "|" << header.aa << "|" << header.tc << "|" << header.rd << "|" << header.ra
-        << "|" << (int)header.rcode << "|" << header.qdcount << "|" << header.ancount
+        << "|" << static_cast<int>(header.rcode) << "|" << header.qdcount << "|" << header.ancount
         << "|" << header.nscount << "|" << header.arcount << "\n";
 
     for (const auto& q : questions) {
@@ -76,9 +75,8 @@ DnsMessage DnsMessage::deserialize(const std::string& data) {
     while (std::getline(stream, line)) {
         if (line.empty()) continue;
         auto fields = splitLine(line, '|');
-        const std::string& tag = fields[0];
 
-        if (tag == "HEADER") {
+        if (const std::string& tag = fields[0]; tag == "HEADER") {
             msg.header.id = static_cast<uint16_t>(std::stoi(fields[1]));
             msg.header.qr = fields[2] == "1";
             msg.header.opcode = static_cast<uint8_t>(std::stoi(fields[3]));

@@ -29,7 +29,7 @@ UdpSocket::~UdpSocket() {
     }
 }
 
-void UdpSocket::bind(int port) {
+void UdpSocket::bind(int port) const {
     sockaddr_in addr {};
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = INADDR_ANY;  // listen on all local interfaces
@@ -40,20 +40,19 @@ void UdpSocket::bind(int port) {
     }
 }
 
-void UdpSocket::sendTo(const std::string& data, const std::string& ip, int port) {
+void UdpSocket::sendTo(const std::string& data, const std::string& ip, int port) const {
     sockaddr_in destAddr {};
     destAddr.sin_family = AF_INET;
     destAddr.sin_port = htons(port);
     if (inet_pton(AF_INET, ip.c_str(), &destAddr.sin_addr) <= 0) {
         throw std::runtime_error("Invalid IP Address: " + ip);
     }
-    ssize_t sent = ::sendto(sockfd_, data.c_str(), data.size(), 0, reinterpret_cast<sockaddr*>(&destAddr), sizeof(destAddr));
 
-    if (sent < 0) {
+    if (const ssize_t sent = ::sendto(sockfd_, data.c_str(), data.size(), 0, reinterpret_cast<sockaddr*>(&destAddr), sizeof(destAddr)); sent < 0) {
         throw std::runtime_error("sendto() failed");
     }
 }
-void UdpSocket::setTimout(int seconds) {
+void UdpSocket::setTimout(const int seconds) const {
     timeval tv {};
     tv.tv_sec = seconds;
     tv.tv_usec = 0;
@@ -63,8 +62,8 @@ void UdpSocket::setTimout(int seconds) {
     }
 }
 
-bool UdpSocket::receiveFrom(std::string& outData, std::string& outSenderIp, int& outSenderPort) {
-char buffer[65536];
+bool UdpSocket::receiveFrom(std::string& outData, std::string& outSenderIp, int outSenderPort) const {
+    char buffer[65536];
     sockaddr_in senderAddr {};
     socklen_t senderLen = sizeof(senderAddr);
 

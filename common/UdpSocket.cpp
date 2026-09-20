@@ -62,7 +62,7 @@ void UdpSocket::setTimout(const int seconds) const {
     }
 }
 
-bool UdpSocket::receiveFrom(std::string& outData, std::string& outSenderIp, int outSenderPort) const {
+bool UdpSocket::receiveFrom(std::string& outData, std::string& outSenderIp, int& outSenderPort) const {
     char buffer[65536];
     sockaddr_in senderAddr {};
     socklen_t senderLen = sizeof(senderAddr);

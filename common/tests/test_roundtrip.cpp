@@ -26,9 +26,9 @@ int main() {
 
     sender.sendTo(wireData, "127.0.0.1", 5999);
 
-    std::string received;
-    std::string senderIp;
-    int senderPort;
+    std::string received {};
+    std::string senderIp {}; 
+    int senderPort {};
 
     bool ok = receiver.receiveFrom(received, senderIp, senderPort);
     if (!ok) {

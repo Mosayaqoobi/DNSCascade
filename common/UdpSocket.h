@@ -33,11 +33,12 @@ public:
     /**
      * @brief block until data arrives
      * 
+     * @param outData
      * @param outSenderIp the ip that the message came from
      * @param outSenderPort the port it came from
      * @return false on timeout, or true on data received
      */
-    bool receiveFrom(std::string& outData, std::string& outSenderIp, int outSenderPort) const;
+    bool receiveFrom(std::string& outData, std::string& outSenderIp, int& outSenderPort) const;
 
     /**
      * @brief Set the Timout object

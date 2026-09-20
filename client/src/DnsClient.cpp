@@ -57,10 +57,13 @@ std::optional<DnsMessage> DnsClient::sendQuery(const std::string& host) {
         .ra = false
     };
 
-    std::vector<Question> questions {{host, RRType::A}};
+    std::vector<Question> questions {{.qname = host, .qtype = RRType::A}};
     DnsMessage msg = {
         .header = header,
         .questions = questions,
+        .answers = {},
+        .authority = {},
+        .additional = {}
     };
 
     const std::string serializedMsg = msg.serialize();
@@ -106,7 +109,7 @@ void DnsClient::run() {
         std::string host = enterHost();
 
         if (auto response = sendQuery(host); !response.has_value()) {
-            std::cout << "No response frome resolver (request timed out)\n";
+            std::cout << "No response from resolver (request timed out)\n";
         } else {
             displayResult(response.value());
         }

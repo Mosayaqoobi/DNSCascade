@@ -1,0 +1,9 @@
+{
+    "port": 5503,
+    "zone": "example.c",
+    "records": [
+        { "name": "www.example.c", "type": "A",  "ttl": 300, "rdata": "10.0.3.10" },
+        { "name": "api.example.c", "type": "A",  "ttl": 60,  "rdata": "10.0.3.30" },
+        { "name": "ns.example.c",  "type": "NS", "ttl": 300, "rdata": "ns.example.c" }
+    ]
+}

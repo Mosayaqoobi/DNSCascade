@@ -1,7 +1,7 @@
 add_library(common STATIC
     DnsMessage.cpp
     UdpSocket.cpp
-    tests/test_roundtrip.cpp
+    ConfigLoader.h
 )
 
 add_executable(test_roundtrip

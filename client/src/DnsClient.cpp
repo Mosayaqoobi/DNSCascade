@@ -9,15 +9,16 @@ date: 9/13/2026
 #include "DnsMessage.h"
 #include "DnsRecord.h"
 #include "UdpSocket.h"
+#include <algorithm>
+#include <cctype>
+#include <exception>
 #include <optional>
 #include <regex>
 #include <iostream>
-#include <thread>
 
-DnsClient::DnsClient(std::string resolverIP, const int resolverPort) :
-    resolverIp_(std::move(resolverIP)), resolverPort_(resolverPort), nextId_(0), maxRetries_(3) {
-        // set the timeout for receiving a reply for 3 seconds;
-        sockfd_.setTimout(3);
+DnsClient::DnsClient(const ClientConfig& config) :
+    resolverIp_(config.resolverIp), resolverPort_(config.resolverPort), maxRetries_(config.maxRetries) {
+        sockfd_.setTimout(config.timeoutSeconds);
 }
 
 std::string DnsClient::enterHost() {
@@ -25,8 +26,11 @@ std::string DnsClient::enterHost() {
     std::cout << "Enter a URL: ";
     std::cin >> host;
     while (!validateHost(host)) {
+        if (!std::cin) {
+            return ""; // stream exhausted (EOF/failure) -- nothing left to read
+        }
         std::cout << "Please enter a valid URL. Starting with www... or https...\n";
-        std::cin>> host;
+        std::cin >> host;
     }
     return host;
 }
@@ -35,83 +39,102 @@ bool DnsClient::validateHost(const std::string& host) {
     if (host.empty()) {
         return false;
     }
-    const std::regex urlPattern(
-    R"(^(https?://)?(www\.)?[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)*\.(com|org|net|test)(/[a-zA-Z0-9.,_@%?&=~+#-]*)*$)"
+    static const std::regex urlPattern(
+    R"(^(https?://)?(www\.)?[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)*\.(com|org|net|test|a|b|c|d)\.?(/[a-zA-Z0-9.,_@%?&=~+#-]*)*$)",
+    std::regex::icase
     );
     return std::regex_match(host, urlPattern);
 }
 
-std::optional<DnsMessage> DnsClient::sendQuery(const std::string& host) {
-    DnsHeader header {
-        .qdcount = 1, 
-        .ancount = 0,
-        .nscount = 0,
-        .arcount = 0, 
-        .id = nextId_++,
-        .rcode = 0,
-        .opcode = 0,
-        .qr = false,
-        .aa = false,
-        .tc = false,
-        .rd = true,
-        .ra = false
-    };
+std::string DnsClient::toHostname(const std::string& url) {
+    std::string host = url;
+    if (const auto scheme = host.find("://"); scheme != std::string::npos) {
+        host.erase(0, scheme + 3);
+    }
+    if (const auto path = host.find('/'); path != std::string::npos) {
+        host.erase(path);
+    }
+    if (!host.empty() && host.back() == '.') {
+        host.pop_back();
+    }
+    std::ranges::transform(host, host.begin(),
+                           [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return host;
+}
 
-    std::vector<Question> questions {{.qname = host, .qtype = RRType::A}};
-    DnsMessage msg = {
-        .header = header,
-        .questions = questions,
-        .answers = {},
-        .authority = {},
-        .additional = {}
-    };
+std::optional<DnsMessage> DnsClient::sendQuery(const std::string& host) {
+    DnsMessage msg {};
+    msg.header.id = nextId_++;
+    msg.header.rd = true;
+    msg.header.qdcount = 1;
+    msg.questions = {Question{.qname = host, .qtype = RRType::A}};
 
     const std::string serializedMsg = msg.serialize();
-    for (int attempt = 0; attempt < maxRetries_; attempt++) {
+    for (int attempt = 0; attempt <= maxRetries_; attempt++) {
         std::cout << "Attempt #" << attempt + 1 << " to send query to local resolver...\n";
         sockfd_.sendTo(serializedMsg, resolverIp_, resolverPort_);    
         std::string responseData {};
         std::string senderIp {};
         int senderPort {};
 
-        if (!sockfd_.receiveFrom(responseData, senderIp, senderPort)) {
-            std::cout << "Attempt #" << attempt + 1 << " timed out, trying again...\n\n";
-            std::this_thread::sleep_for(std::chrono::seconds(1));
-            continue;
+        // Skip past any late reply to an earlier query until ours arrives or we time out.
+        while (sockfd_.receiveFrom(responseData, senderIp, senderPort)) {
+            try {
+                DnsMessage response = DnsMessage::deserialize(responseData);
+                if (response.header.qr && response.header.id == msg.header.id) {
+                    return response;
+                }
+            } catch (const std::exception& e) {
+                std::cout << "Ignoring malformed reply: " << e.what() << "\n";
+            }
         }
-        DnsMessage response = DnsMessage::deserialize(responseData);
-        //not the correct response
-        if (response.header.id != header.id) {
-            continue;
-        }
-        return response;
+        std::cout << "Attempt #" << attempt + 1 << " timed out.\n";
     }
     return std::nullopt;
 }
 
-void DnsClient::displayResult(const DnsMessage& response) {
-    if (response.header.rcode != 0 || response.answers.empty()) {
-        std::cout << "Could not resolve host (rcode " << static_cast<int>(response.header.rcode) << ")\n";
-        return;
-    }
-    for (const auto& rr : response.answers) {
-        if (rr.type == RRType::A) {
-            std::cout << rr.name << " -> " << rr.rdata << "\n";
+void DnsClient::displayResult(const std::string& host, const DnsMessage& response) {
+    switch (response.header.rcode) {
+        case Rcode::NOERROR:
+            break;
+        case Rcode::NXDOMAIN:
+            std::cout << host << " does not exist (NXDOMAIN)\n";
             return;
+        case Rcode::SERVFAIL:
+            std::cout << "The resolver could not complete the lookup for " << host << " (SERVFAIL)\n";
+            return;
+        default:
+            std::cout << "Could not resolve " << host << " (rcode "
+                      << static_cast<int>(response.header.rcode) << ")\n";
+            return;
+    }
+
+    bool foundAddress = false;
+    for (const auto& rr : response.answers) {
+        if (rr.type == RRType::CNAME) {
+            std::cout << rr.name << " is an alias for " << rr.rdata << "\n";
+        } else if (rr.type == RRType::A) {
+            std::cout << rr.name << " -> " << rr.rdata << "  (ttl " << rr.ttl << "s)\n";
+            foundAddress = true;
         }
     }
-    std::cout << "No A record in response\n";
-
+    if (!foundAddress) {
+        std::cout << host << " exists but has no address record\n";
+    }
 }
 
 void DnsClient::run() {
     while (true) {
-        std::string host = enterHost();
+        const std::string url = enterHost();
+        if (url.empty()) {
+            break; // input stream exhausted, nothing more to resolve
+        }
+        const std::string host = toHostname(url);
 
         if (auto response = sendQuery(host); !response.has_value()) {
             std::cout << "No response from resolver (request timed out)\n";
         } else {
-            displayResult(response.value());
+            displayResult(host, response.value());
         }
         std::cout << "Resolve another? (y/n)\n";
         std::string again;

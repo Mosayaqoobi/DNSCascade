@@ -11,33 +11,28 @@ date: 9/13/2026
 #include <stdexcept>
 
 namespace {
-    std::string rrTypeToString(const RRType& type) {
-        switch (type) {
-            case RRType::A: return "A";
-            case RRType::NS: return "NS";
-            case RRType::CNAME: return "CNAME";
-        }
-        throw std::runtime_error("Unknown RRType");
-    }
-    RRType stringToRRType(const std::string& s) {
-        if (s == "A") return RRType::A;
-        if (s == "NS") return RRType::NS;
-        if (s == "CNAME") return RRType::CNAME;
-        throw std::runtime_error("Unknown RRType String: " + s);
-    }
     void serializeRR(std::ostringstream& out, const std::string& tag, const ResourceRecord& rr) {
         out << tag << "|" << rr.name << "|" << rrTypeToString(rr.type)
         << "|" << rr.ttl << "|" << rr.rdata << "\n";
     }
 
+    void requireFields(const std::vector<std::string>& fields, const size_t count) {
+        if (fields.size() < count) {
+            throw std::runtime_error("Malformed " + fields[0] + " line: expected " +
+                                     std::to_string(count) + " fields, got " + std::to_string(fields.size()));
+        }
+    }
+
     ResourceRecord deserializeRR(const std::vector<std::string>& fields) {
+        requireFields(fields, 5);
         ResourceRecord rr;
         rr.name = fields[1];
-        rr.type = stringToRRType(fields[2]);
+        rr.type = rrTypeFromString(fields[2]);
         rr.ttl = static_cast<uint32_t>(std::stoul(fields[3]));
         rr.rdata = fields[4];
         return rr;
     }
+
     std::vector<std::string> splitLine(const std::string& line, char delim) {
         std::vector<std::string> tokens;
         std::stringstream ss(line);
@@ -68,15 +63,17 @@ std::string DnsMessage::serialize() const {
 }
 
 DnsMessage DnsMessage::deserialize(const std::string& data) {
-    DnsMessage msg;
+    DnsMessage msg {};
     std::istringstream stream(data);
     std::string line;
 
     while (std::getline(stream, line)) {
         if (line.empty()) continue;
         auto fields = splitLine(line, '|');
+        if (fields.empty()) continue;
 
         if (const std::string& tag = fields[0]; tag == "HEADER") {
+            requireFields(fields, 13);
             msg.header.id = static_cast<uint16_t>(std::stoi(fields[1]));
             msg.header.qr = fields[2] == "1";
             msg.header.opcode = static_cast<uint8_t>(std::stoi(fields[3]));
@@ -90,11 +87,12 @@ DnsMessage DnsMessage::deserialize(const std::string& data) {
             msg.header.nscount  = static_cast<uint16_t>(std::stoi(fields[11]));
             msg.header.arcount  = static_cast<uint16_t>(std::stoi(fields[12]));
         } else if (tag == "QUESTION") {
+            requireFields(fields, 3);
             Question q;
             q.qname = fields[1];
-            q.qtype = stringToRRType(fields[2]);
+            q.qtype = rrTypeFromString(fields[2]);
             msg.questions.push_back(q);
-        } 
+        }
         else if (tag == "ANSWER") msg.answers.push_back(deserializeRR(fields));
         else if (tag == "AUTHORITY") msg.authority.push_back(deserializeRR(fields));
         else if (tag == "ADDITIONAL") msg.additional.push_back(deserializeRR(fields));
@@ -102,5 +100,3 @@ DnsMessage DnsMessage::deserialize(const std::string& data) {
     }
     return msg;
 }
-
-

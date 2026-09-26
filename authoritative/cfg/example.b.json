@@ -1,0 +1,9 @@
+{
+    "port": 5502,
+    "zone": "example.b",
+    "records": [
+        { "name": "example.b",      "type": "A",     "ttl": 300, "rdata": "10.0.2.1" },
+        { "name": "www.example.b",  "type": "A",     "ttl": 300, "rdata": "10.0.2.10" },
+        { "name": "shop.example.b", "type": "CNAME", "ttl": 300, "rdata": "www.example.c" }
+    ]
+}

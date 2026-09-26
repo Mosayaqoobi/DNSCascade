@@ -10,8 +10,22 @@ Date: 9/13/2026
 
 #include "DnsMessage.h"
 #include "UdpSocket.h"
+#include <nlohmann/json.hpp>
+#include <cstdint>
+#include <optional>
 #include <string>
 
+/**
+ * @brief Mirrors client/cfg/client.json.
+ */
+struct ClientConfig {
+    std::string resolverIp;
+    int resolverPort;
+    int timeoutSeconds;   ///< how long to wait for the resolver on each attempt
+    int maxRetries;       ///< resends after the first attempt times out
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE(ClientConfig, resolverIp, resolverPort, timeoutSeconds, maxRetries)
+};
 
 /**
  * @brief Object for the DNSClient that handles the initiation of the dns simulation
@@ -20,7 +34,7 @@ Date: 9/13/2026
 class DnsClient {
 
 public:
-    DnsClient(std::string resolverIP, int resolverPort);
+    explicit DnsClient(const ClientConfig& config);
     
     /**
      * @brief Main loop that allows for prompting, validating, sending, displaying and repeating the 
@@ -33,7 +47,7 @@ private:
     /**
      * @brief Allows the user to enter in a hostname from the terminal
      * 
-     * @return std::string 
+     * @return the entered URL, or "" once input is exhausted
      */
     static std::string enterHost();
     
@@ -45,25 +59,33 @@ private:
      * @return false if host is not valid
      */
     static bool validateHost(const std::string& host);
+
     /**
-     * @brief If the host is valid, then send create a dnsmessage and send it to the local dns server
+     * @brief Reduce a URL to the bare hostname DNS resolves,
+     * e.g. "https://WWW.Example.a/page" -> "www.example.a".
+     */
+    static std::string toHostname(const std::string& url);
+
+    /**
+     * @brief Build a query for `host` and send it to the local resolver, retrying on timeout
      * 
      * @param host the hostname to get the ip
-     * @return DnsMessage object that the local dns understands
+     * @return the resolver's reply, or nullopt if it never answered
      */
     std::optional<DnsMessage> sendQuery(const std::string& host);
     
     /**
-     * @brief Breifly displays the result of the query
+     * @brief Briefly displays the result of the query
      * 
+     * @param host the hostname that was asked about
      * @param response the response of the query
      */
-    static void displayResult(const DnsMessage& response) ;
+    static void displayResult(const std::string& host, const DnsMessage& response);
 
     std::string resolverIp_;
     int resolverPort_;
     UdpSocket sockfd_;
-    uint16_t nextId_;
+    uint16_t nextId_ = 0;
     int maxRetries_;
 
 };
